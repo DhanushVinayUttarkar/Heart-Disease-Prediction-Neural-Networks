@@ -49,6 +49,7 @@ mean_cigs = round(data["cigs"].mean())
 data["cigs"].fillna(mean_cigs, inplace=True)
 
 data.loc[data["cigs"] > 0, "smoke"] = 1
+data.loc[data["cigs"] <= 0, "smoke"] = 0
 
 data.loc[data["smoke"] == 1, "years"] = round(data["years"].mean())
 
@@ -151,9 +152,22 @@ data["exeref"].fillna(mode_exeref, inplace=True)
 mode_exerwm = data["exerwm"].mode()[0]
 data["exerwm"].fillna(mode_exerwm, inplace=True)
 
+mode_cmo = round(data["cmo"].mean())
+data["cmo"].fillna(mode_cmo, inplace=True)
+
+mode_cday = round(data["cday"].mean())
+data["cday"].fillna(mode_cday, inplace=True)
+
+mode_cyr = data["cyr"].mode()[0]
+data["cyr"].fillna(mode_cyr, inplace=True)
+
+missing_values = data.isnull().sum()
+print("Missing Values per Column post data processing:")
+print(missing_values)
+
 # Setting as the target variable
 X = data.drop(columns=["num"])
-# X = data[["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"]]
+#X = data[["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"]]
 y = data["num"]
 
 # SMOTE to balance the dataset
@@ -164,21 +178,21 @@ X_balanced, y_balanced = smote.fit_resample(X, y)
 scaler = MinMaxScaler()
 X_scaled = scaler.fit_transform(X_balanced)
 
-"""# Apply PCA
+# Apply PCA
 num_components = 13  # You can adjust the number of components
 pca = PCA(n_components=num_components)
 X_pca = pca.fit_transform(X_scaled)
 selected_feature_indices = np.argsort(pca.components_)[::-1][:num_components]
 selected_features = [X.columns[idx] for idx in selected_feature_indices]
-print("Selected Features after PCA:", selected_features)"""
+print("Selected Features after PCA:", selected_features)
 
-# Apply Chi-Squared feature selection
+"""# Apply Chi-Squared feature selection
 num_features_to_select = 13  # You can adjust the number of features
 chi2_selector = SelectKBest(chi2, k=num_features_to_select)
 X_chi2_selected = chi2_selector.fit_transform(X_scaled, y_balanced)
 selected_feature_indices = chi2_selector.get_support(indices=True)
 selected_features = [X.columns[idx] for idx in selected_feature_indices]
-print("Selected chi-sq Features:", selected_features)
+print("Selected chi-sq Features:", selected_features)"""
 
 # Logistic Regression model for RFE implementation
 lr_model = LogisticRegression()
@@ -195,16 +209,16 @@ svm_model = SVC()
 
 # Define CNN model
 cnn_model = Sequential()
-#cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_pca.shape[1], 1)))
+cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_pca.shape[1], 1)))
 #cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_scaled.shape[1], 1)))
-cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_chi2_selected.shape[1], 1)))
+#cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_chi2_selected.shape[1], 1)))
 cnn_model.add(MaxPooling1D(pool_size=2))
 cnn_model.add(Flatten())
 
 # Define LSTM model
 lstm_model = Sequential()
-lstm_model.add(LSTM(64, input_shape=(X_chi2_selected.shape[1], 1)))
-#lstm_model.add(LSTM(64, input_shape=(X_pca.shape[1], 1)))
+#lstm_model.add(LSTM(64, input_shape=(X_chi2_selected.shape[1], 1)))
+lstm_model.add(LSTM(64, input_shape=(X_pca.shape[1], 1)))
 #lstm_model.add(LSTM(64, input_shape=(X_scaled.shape[1], 1)))
 
 # Concatenate both models
@@ -226,17 +240,17 @@ lstm_model.add(Dense(1, activation='sigmoid'))
 lstm_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])"""
 
 # K-Fold Cross-Validation
-num_folds = 5
+num_folds = 10
 kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
 
-#for fold, (train_index, test_index) in enumerate(kf.split(X_pca)):
-for fold, (train_index, test_index) in enumerate(kf.split(X_chi2_selected)):
+for fold, (train_index, test_index) in enumerate(kf.split(X_pca)):
+#for fold, (train_index, test_index) in enumerate(kf.split(X_chi2_selected)):
 #for fold, (train_index, test_index) in enumerate(kf.split(X_scaled)):
     print(f"Fold: {fold+1}")
 
-    #X_train, X_test = X_pca[train_index], X_pca[test_index]
+    X_train, X_test = X_pca[train_index], X_pca[test_index]
     #X_train, X_test = X_scaled[train_index], X_scaled[test_index]
-    X_train, X_test = X_chi2_selected[train_index], X_chi2_selected[test_index]
+    #X_train, X_test = X_chi2_selected[train_index], X_chi2_selected[test_index]
     y_train, y_test = y_balanced[train_index], y_balanced[test_index]
 
     # Logistic Regression
@@ -263,13 +277,21 @@ for fold, (train_index, test_index) in enumerate(kf.split(X_chi2_selected)):
     print("SVM Classification Report:")
     print(classification_report(y_test, y_pred_svm))
 
-    # Reshape data for LSTM
     X_train_lstm = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
     X_test_lstm = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
 
-    # Reshape data for CNN
+    """# Reshape data for LSTM
+    X_train_lstm = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
+    X_test_lstm = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))"""
+
+
     X_train_cnn = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
     X_test_cnn = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+
+
+    """# Reshape data for CNN
+    X_train_cnn = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
+    X_test_cnn = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))"""
 
     # Ensemble model
     ensemble_model.fit([X_train_cnn, X_train_lstm], y_train, epochs=10, batch_size=32, verbose=0)
