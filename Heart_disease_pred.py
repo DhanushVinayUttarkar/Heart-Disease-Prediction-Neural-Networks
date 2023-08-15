@@ -136,6 +136,21 @@ data["rldv5e"].fillna(mean_rldv5e, inplace=True)
 mode_ca = data["ca"].mode()[0]
 data["ca"].fillna(mode_ca, inplace=True)
 
+mode_restef = round(data["restef"].mean())
+data["restef"].fillna(mode_restef, inplace=True)
+
+mode_restef = round(data["restef"].mean())
+data["restef"].fillna(mode_restef, inplace=True)
+
+mode_restwm = data["restwm"].mode()[0]
+data["restwm"].fillna(mode_restwm, inplace=True)
+
+mode_exeref = data["exeref"].mode()[0]
+data["exeref"].fillna(mode_exeref, inplace=True)
+
+mode_exerwm = data["exerwm"].mode()[0]
+data["exerwm"].fillna(mode_exerwm, inplace=True)
+
 # Setting as the target variable
 X = data.drop(columns=["num"])
 # X = data[["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"]]
