@@ -19,7 +19,7 @@ print(chd_data.head())
 print(chd_data.describe())
 
 # Removing unused and undefined values
-data = chd_data.drop(columns=["Id", "ccf", "name", "junk", "cathef", "lmt", "ladprox", "laddist", "diag", "cxmain", "ramus", "om1", "om2", "rcaprox", "rcadist", "lvx1", "lvx2", "lvx3", "lvx4", "lvf", "trestbps.1", "pncaden", "htn"])
+data = chd_data.drop(columns=["Id", "ccf", "name", "junk", "cathef", "lmt", "ladprox", "laddist", "diag", "cxmain", "ramus", "om1", "om2", "rcaprox", "rcadist", "lvx1", "lvx2", "lvx3", "lvx4", "lvf", "trestbps.1", "pncaden", "htn", "restckm", "exerckm"])
 
 data.replace(-9, np.nan, inplace=True)
 missing_values = data.isnull().sum()
@@ -135,8 +135,6 @@ data["rldv5e"].fillna(mean_rldv5e, inplace=True)
 
 mode_ca = data["ca"].mode()[0]
 data["ca"].fillna(mode_ca, inplace=True)
-
-
 
 # Setting as the target variable
 X = data.drop(columns=["num"])
