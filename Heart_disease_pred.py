@@ -1,308 +1,203 @@
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.decomposition import PCA
+import numpy as np
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout, Conv1D, MaxPooling1D, Flatten, SimpleRNN
 from sklearn.feature_selection import SelectKBest, chi2
+from keras.regularizers import l1
+from keras.metrics import BinaryAccuracy
 from sklearn.linear_model import LogisticRegression
-from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import LSTM, Dense, Conv1D, MaxPooling1D, Flatten, concatenate, Input
-from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
 from imblearn.over_sampling import SMOTE
 
 # Load the dataset
-chd_data = pd.read_csv("Cleaveland_heart_disease_dataset.csv")
-print(chd_data.head())
-print(chd_data.describe())
+df0 = pd.read_csv('Cleaveland_heart_disease_dataset.csv')
+
+print(df0.head())
+print(df0.info())
+shape = df0.shape
 
 # Removing unused and undefined values
-data = chd_data.drop(columns=["Id", "ccf", "name", "junk", "cathef", "lmt", "ladprox", "laddist", "diag", "cxmain", "ramus", "om1", "om2", "rcaprox", "rcadist", "lvx1", "lvx2", "lvx3", "lvx4", "lvf", "trestbps.1", "pncaden", "htn", "restckm", "exerckm"])
+df = df0.drop(columns=["Id", "ccf", "name", "junk", "cathef", "lmt", "ladprox", "laddist", "diag", "cxmain", "ramus", "om1", "om2", "rcaprox", "rcadist", "lvx1", "lvx2", "lvx3", "lvx4", "lvf", "trestbps.1", "pncaden", "htn", "restckm", "exerckm"])
 
-data.replace(-9, np.nan, inplace=True)
-missing_values = data.isnull().sum()
-print("Missing Values per Column:")
-print(missing_values)
+# Count of missing values
+missing_values = df.isnull().sum()
 
-# replace missing values
-mode_painloc = data["painloc"].mode()[0]
-data["painloc"].fillna(mode_painloc, inplace=True)
+# target variable balance check
+target_distribution = df['num'].value_counts(normalize=True) * 100
 
-mode_painexer = data["painexer"].mode()[0]
-data["painexer"].fillna(mode_painexer, inplace=True)
+print(shape, missing_values[missing_values > 0], target_distribution)
 
-mode_relrest = data["relrest"].mode()[0]
-data["relrest"].fillna(mode_relrest, inplace=True)
+df['num'] = df['num'].apply(lambda x: 0 if x == 0 else 1)
 
-mode_cp = data["cp"].mode()[0]
-data["cp"].fillna(mode_cp, inplace=True)
+print("target variable count")
+print(df['num'].value_counts())
 
-mean_trestbps = round(data["trestbps"].mean())
-data["trestbps"].fillna(mean_trestbps, inplace=True)
+# Replace (-9) with Na
+df.replace(-9, float('nan'), inplace=True)
 
-mean_chol = data["chol"].mean()
-data["chol"].fillna(f"{mean_chol:.3f}", inplace=True)
 
-mean_cigs = round(data["cigs"].mean())
-data["cigs"].fillna(mean_cigs, inplace=True)
+# impute missing values with the median
+for col in df.columns:
+    median_value = df[col].median()
+    df[col].fillna(median_value, inplace=True)
 
-data.loc[data["cigs"] > 0, "smoke"] = 1
-data.loc[data["cigs"] <= 0, "smoke"] = 0
-
-data.loc[data["smoke"] == 1, "years"] = round(data["years"].mean())
-
-mode_fbs = data["fbs"].mode()[0]
-data["fbs"].fillna(mode_fbs, inplace=True)
-
-mode_famhist = data["famhist"].mode()[0]
-data["famhist"].fillna(mode_famhist, inplace=True)
-
-mode_restecg = data["restecg"].mode()[0]
-data["restecg"].fillna(mode_restecg, inplace=True)
-
-mean_ekgmo = round(data["ekgmo"].mean())
-data["ekgmo"].fillna(mean_ekgmo, inplace=True)
-
-mean_ekgmo = round(data["ekgmo"].mean())
-data["ekgmo"].fillna(mean_ekgmo, inplace=True)
-
-mean_ekgday = round(data["ekgday"].mean())
-data["ekgday"].fillna(mean_ekgday, inplace=True)
-
-mode_ekgyr = data["ekgyr"].mode()[0]
-data["ekgyr"].fillna(mode_ekgyr, inplace=True)
-
-mode_dig = data["dig"].mode()[0]
-data["dig"].fillna(mode_dig, inplace=True)
-
-mode_prop = data["prop"].mode()[0]
-data["prop"].fillna(mode_prop, inplace=True)
-
-mode_nitr = data["nitr"].mode()[0]
-data["nitr"].fillna(mode_nitr, inplace=True)
-
-mode_pro = data["pro"].mode()[0]
-data["pro"].fillna(mode_pro, inplace=True)
-
-mode_diuretic = data["diuretic"].mode()[0]
-data["diuretic"].fillna(mode_diuretic, inplace=True)
-
-mode_proto = data["proto"].mode()[0]
-data["proto"].fillna(mode_proto, inplace=True)
-
-mean_thaldur = data["thaldur"].mean()
-data["thaldur"].fillna(f"{mean_thaldur:.1f}", inplace=True)
-
-mean_thaltime = data["thaltime"].mean()
-data["thaltime"].fillna(f"{mean_thaltime:.1f}", inplace=True)
-
-mean_met = round(data["met"].mean())
-data["met"].fillna(mean_met, inplace=True)
-
-mean_thalach = round(data["thalach"].mean())
-data["thalach"].fillna(mean_thalach, inplace=True)
-
-mean_thalrest = round(data["thalrest"].mean())
-data["thalrest"].fillna(mean_thalrest, inplace=True)
-
-mean_tpeakbps = round(data["tpeakbps"].mean())
-data["tpeakbps"].fillna(mean_tpeakbps, inplace=True)
-
-mean_tpeakbpd = round(data["tpeakbpd"].mean())
-data["tpeakbpd"].fillna(mean_tpeakbpd, inplace=True)
-
-mean_trestbpd = round(data["trestbpd"].mean())
-data["trestbpd"].fillna(mean_trestbpd, inplace=True)
-
-mode_exang = data["exang"].mode()[0]
-data["exang"].fillna(mode_exang, inplace=True)
-
-mode_xhypo = data["xhypo"].mode()[0]
-data["xhypo"].fillna(mode_xhypo, inplace=True)
-
-mean_oldpeak = data["oldpeak"].mean()
-data["oldpeak"].fillna(f"{mean_oldpeak:.1f}", inplace=True)
-
-mode_slope = data["slope"].mode()[0]
-data["slope"].fillna(mode_slope, inplace=True)
-
-mean_rldv5 = round(data["rldv5"].mean())
-data["rldv5"].fillna(mean_rldv5, inplace=True)
-
-mean_rldv5e = round(data["rldv5e"].mean())
-data["rldv5e"].fillna(mean_rldv5e, inplace=True)
-
-mode_ca = data["ca"].mode()[0]
-data["ca"].fillna(mode_ca, inplace=True)
-
-mode_restef = round(data["restef"].mean())
-data["restef"].fillna(mode_restef, inplace=True)
-
-mode_restef = round(data["restef"].mean())
-data["restef"].fillna(mode_restef, inplace=True)
-
-mode_restwm = data["restwm"].mode()[0]
-data["restwm"].fillna(mode_restwm, inplace=True)
-
-mode_exeref = data["exeref"].mode()[0]
-data["exeref"].fillna(mode_exeref, inplace=True)
-
-mode_exerwm = data["exerwm"].mode()[0]
-data["exerwm"].fillna(mode_exerwm, inplace=True)
-
-mode_cmo = round(data["cmo"].mean())
-data["cmo"].fillna(mode_cmo, inplace=True)
-
-mode_cday = round(data["cday"].mean())
-data["cday"].fillna(mode_cday, inplace=True)
-
-mode_cyr = data["cyr"].mode()[0]
-data["cyr"].fillna(mode_cyr, inplace=True)
-
-missing_values = data.isnull().sum()
-print("Missing Values per Column post data processing:")
-print(missing_values)
-
-# Setting as the target variable
-X = data.drop(columns=["num"])
-#X = data[["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"]]
-y = data["num"]
-
-# SMOTE to balance the dataset
-smote = SMOTE(sampling_strategy='auto', random_state=42)
-X_balanced, y_balanced = smote.fit_resample(X, y)
-
-# Feature scaling
+# Normalization
 scaler = MinMaxScaler()
-X_scaled = scaler.fit_transform(X_balanced)
+df_scaled = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
 
-# Apply PCA
-num_components = 13  # You can adjust the number of components
-pca = PCA(n_components=num_components)
-X_pca = pca.fit_transform(X_scaled)
-selected_feature_indices = np.argsort(pca.components_)[::-1][:num_components]
-selected_features = [X.columns[idx] for idx in selected_feature_indices]
-print("Selected Features after PCA:", selected_features)
+# Splitting dataset into training and test
+X = df_scaled.drop('num', axis=1)
+y = df['num']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-"""# Apply Chi-Squared feature selection
-num_features_to_select = 13  # You can adjust the number of features
-chi2_selector = SelectKBest(chi2, k=num_features_to_select)
-X_chi2_selected = chi2_selector.fit_transform(X_scaled, y_balanced)
-selected_feature_indices = chi2_selector.get_support(indices=True)
-selected_features = [X.columns[idx] for idx in selected_feature_indices]
-print("Selected chi-sq Features:", selected_features)"""
+print(X_train.shape, X_test.shape)
 
-# Logistic Regression model for RFE implementation
-lr_model = LogisticRegression()
-# lr_model = LogisticRegression(C=1.0, class_weight='balanced', dual=False, fit_intercept=True, intercept_scaling=1, max_iter=100, multi_class='auto', n_jobs=None, penalty='l2', random_state=1234, solver='lbfgs', tol=0.0001, verbose=0,warm_start=False)
+"""# Applying SMOTE
+smote = SMOTE(random_state=42)
+X_train, y_train = smote.fit_resample(X_train, y_train)
 
-# Decision tree model
-dt_model = tree.DecisionTreeClassifier()
+print("Distribution after SMOTE:")
+print(y_train.value_counts())"""
 
-# Random forest model
-rf_model = RandomForestClassifier(max_depth=24, random_state=0)
+# Feature selection using chi-squared method
+selector = SelectKBest(chi2, k=14)
+X_train_selected = selector.fit_transform(X_train, y_train)
+X_test_selected = selector.transform(X_test)
 
-# SVM model
-svm_model = SVC()
-
-# Define CNN model
-cnn_model = Sequential()
-cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_pca.shape[1], 1)))
-#cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_scaled.shape[1], 1)))
-#cnn_model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_chi2_selected.shape[1], 1)))
-cnn_model.add(MaxPooling1D(pool_size=2))
-cnn_model.add(Flatten())
-
-# Define LSTM model
-lstm_model = Sequential()
-#lstm_model.add(LSTM(64, input_shape=(X_chi2_selected.shape[1], 1)))
-lstm_model.add(LSTM(64, input_shape=(X_pca.shape[1], 1)))
-#lstm_model.add(LSTM(64, input_shape=(X_scaled.shape[1], 1)))
-
-# Concatenate both models
-merged = concatenate([cnn_model.output, lstm_model.output])
-
-# Additional dense layers for ensemble
-ensemble_layers = Dense(32, activation='relu')(merged)
-ensemble_layers = Dense(1, activation='sigmoid')(ensemble_layers)
-
-# Create ensemble model
-ensemble_model = Model(inputs=[cnn_model.input, lstm_model.input], outputs=ensemble_layers)
-ensemble_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# Print chi-sq features
+selected_features = X.columns[selector.get_support()]
+print("Selected features using chi-squared method:")
+print(selected_features)
 
 
-"""# LSTM model
-lstm_model = Sequential()
-lstm_model.add(LSTM(64, input_shape=(X_pca.shape[1], 1)))
-lstm_model.add(Dense(1, activation='sigmoid'))
-lstm_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])"""
+# creating LSTM model with L1 regularization
+def create_L1_reg_lstm_model(input_shape):
+    model = Sequential()
+    model.add(LSTM(50, input_shape=input_shape, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(50, return_sequences=False))
+    model.add(Dropout(0.2))
+    model.add(Dense(10, activation='relu', activity_regularizer=l1(0.001)))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
 
-# K-Fold Cross-Validation
-num_folds = 10
-kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+# Training the model
+input_shape = (X_train_selected.shape[1], 1)
+model = create_L1_reg_lstm_model(input_shape)
+X_train_chisq_reshaped = np.reshape(X_train_selected, (X_train_selected.shape[0], X_train_selected.shape[1], 1))
+model.fit(X_train_chisq_reshaped, y_train, epochs=50, batch_size=64)
+X_test_chisq_reshaped = np.reshape(X_test_selected, (X_test_selected.shape[0], X_test_selected.shape[1], 1))
+loss, accuracy = model.evaluate(X_test_chisq_reshaped, y_test, verbose=0)
 
-for fold, (train_index, test_index) in enumerate(kf.split(X_pca)):
-#for fold, (train_index, test_index) in enumerate(kf.split(X_chi2_selected)):
-#for fold, (train_index, test_index) in enumerate(kf.split(X_scaled)):
-    print(f"Fold: {fold+1}")
+print("LSTM Accuracy: {:.2f}%".format(accuracy * 100))
 
-    X_train, X_test = X_pca[train_index], X_pca[test_index]
-    #X_train, X_test = X_scaled[train_index], X_scaled[test_index]
-    #X_train, X_test = X_chi2_selected[train_index], X_chi2_selected[test_index]
-    y_train, y_test = y_balanced[train_index], y_balanced[test_index]
+# for front end
+# model.save("lstm_model.h5")
 
-    # Logistic Regression
-    lr_model.fit(X_train, y_train)
-    y_pred_lr = lr_model.predict(X_test)
-    print("Logistic Regression Classification Report:")
-    print(classification_report(y_test, y_pred_lr))
+# creating the CNN model
+def create_cnn_model(input_shape):
+    model = Sequential()
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Flatten())
+    model.add(Dense(50, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
 
-    # Decision Tree
-    dt_model.fit(X_train, y_train)
-    y_pred_dt = dt_model.predict(X_test)
-    print("Decision Tree Classification Report:")
-    print(classification_report(y_test, y_pred_dt))
+# reshaping input to be 3D [samples, time steps, features]
+X_train_cnn = X_train_selected.reshape(X_train_selected.shape[0], X_train_selected.shape[1], 1)
+X_test_cnn = X_test_selected.reshape(X_test_selected.shape[0], X_test_selected.shape[1], 1)
 
-    # Random Forest
-    rf_model.fit(X_train, y_train)
-    y_pred_rf = rf_model.predict(X_test)
-    print("Random Forest Classification Report:")
-    print(classification_report(y_test, y_pred_rf))
+# train the CNN model
+cnn_model = create_cnn_model((X_train_cnn.shape[1], X_train_cnn.shape[2]))
+history_cnn = cnn_model.fit(X_train_cnn, y_train, epochs=50, batch_size=64, validation_data=(X_test_cnn, y_test), verbose=0)
 
-    # SVM Model
-    svm_model.fit(X_train, y_train)
-    y_pred_svm = svm_model.predict(X_test)
-    print("SVM Classification Report:")
-    print(classification_report(y_test, y_pred_svm))
+# Evaluate CNN model
+cnn_loss, cnn_accuracy = cnn_model.evaluate(X_test_cnn, y_test, verbose=0)
+print("CNN Accuracy: {:.2f}%".format(cnn_accuracy * 100))
 
-    X_train_lstm = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test_lstm = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+# creating the FF-NN
+def create_nn_model(input_shape):
+    model = Sequential()
+    model.add(Dense(128, input_dim=input_shape, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
 
-    """# Reshape data for LSTM
-    X_train_lstm = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test_lstm = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))"""
+# FF-NN model
+nn_model = create_nn_model(X_train_selected.shape[1])
+history_nn = nn_model.fit(X_train_selected, y_train, epochs=50, batch_size=64, validation_data=(X_test_selected, y_test), verbose=0)
 
+# Evaluate FF-NN model
+nn_loss, nn_accuracy = nn_model.evaluate(X_test_selected, y_test, verbose=0)
+print("FF Neural Network Accuracy: {:.2f}%".format(nn_accuracy * 100))
 
-    X_train_cnn = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test_cnn = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+# creating the RNN model
+def create_rnn_model(input_shape):
+    model = Sequential()
+    model.add(SimpleRNN(50, input_shape=input_shape, return_sequences=True))
+    model.add(SimpleRNN(50, return_sequences=False))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
 
+# reshape input to be 3D
+X_train_rnn = X_train_selected.reshape(X_train_selected.shape[0], X_train_selected.shape[1], 1)
+X_test_rnn = X_test_selected.reshape(X_test_selected.shape[0], X_test_selected.shape[1], 1)
 
-    """# Reshape data for CNN
-    X_train_cnn = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test_cnn = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))"""
+# train the RNN model
+rnn_model = create_rnn_model((X_train_rnn.shape[1], X_train_rnn.shape[2]))
+history_rnn = rnn_model.fit(X_train_rnn, y_train, epochs=50, batch_size=64, validation_data=(X_test_rnn, y_test), verbose=0)
 
-    # Ensemble model
-    ensemble_model.fit([X_train_cnn, X_train_lstm], y_train, epochs=10, batch_size=32, verbose=0)
-    _, accuracy = ensemble_model.evaluate([X_test_cnn, X_test_lstm], y_test)
-    print(f"Ensemble Model Accuracy: {accuracy}")
+# evaluate RNN model
+rnn_loss, rnn_accuracy = rnn_model.evaluate(X_test_rnn, y_test, verbose=0)
+print("RNN Accuracy: {:.2f}%".format(rnn_accuracy * 100))
 
-    """# LSTM
-    X_train_lstm = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test_lstm = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
-    lstm_model.fit(X_train_lstm, y_train, epochs=20, batch_size=32, verbose=0)
-    _, accuracy = lstm_model.evaluate(X_test_lstm, y_test)
-    print(f"LSTM Accuracy: {accuracy}")"""
+#############################################################
+# Regular ML Methods
+# train the LR model
+logreg = LogisticRegression(max_iter=1000, random_state=42)
+logreg.fit(X_train_selected, y_train)
 
-    print("-" * 40)
+# predict on the test set
+y_pred_logreg = logreg.predict(X_test_selected)
+
+# evaluate the model
+logreg_accuracy = accuracy_score(y_test, y_pred_logreg) * 100
+
+print("LR accuracy:")
+print(logreg_accuracy, "\n")
+
+# train the DeT model
+dtree = DecisionTreeClassifier(random_state=42)
+dtree.fit(X_train_selected, y_train)
+
+# predict on the test set
+y_pred_dtree = dtree.predict(X_test_selected)
+
+# evaluate the model
+dtree_accuracy = accuracy_score(y_test, y_pred_dtree) * 100
+
+print("DT accuracy:")
+print(dtree_accuracy, "\n")
+
+# train the RF model
+rf = RandomForestClassifier(random_state=42, n_estimators=100)
+rf.fit(X_train_selected, y_train)
+
+# predict on the test set
+y_pred_rf = rf.predict(X_test_selected)
+
+# evaluate the model
+rf_accuracy = accuracy_score(y_test, y_pred_rf) * 100
+
+print("RF accuracy:")
+print(rf_accuracy, "\n")
