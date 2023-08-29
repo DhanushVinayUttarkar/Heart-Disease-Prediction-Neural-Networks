@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Disease Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            color: #343a40;
+        }
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 14px 20px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            color: #343a40;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Heart Disease Predictor</h2>
+
+<form action="/predict" method="post">
+    Sex: <input type="number" name="sex" min="0" max="1"><br>
+    Painexer: <input type="number" name="painexer" min="0" max="1"><br>
+    Cp: <input type="number" name="cp" min="0" max="1"><br>
+    Smoke: <input type="number" name="smoke" min="0"><br>
+    Fbs: <input type="number" name="fbs" min="0"><br>
+    Dm: <input type="number" name="dm" min="0"><br>
+    Prop: <input type="number" name="prop" min="0"><br>
+    Nitr: <input type="number" name="nitr" min="0"><br>
+    Pro: <input type="number" name="pro" min="0"><br>
+    Proto: <input type="number" name="proto" min="0"><br>
+    Thalach: <input type="number" name="thalach" min="0"><br>
+    Exang: <input type="number" name="exang" min="0"><br>
+    Slope: <input type="number" name="slope" min="0"><br>
+    CA: <input type="number" name="ca" min="0"><br>
+    <input type="submit" value="Predict">
+</form>
+
+<div id="result">
+    {% if result %}
+        {{ result }}
+    {% endif %}
+</div>
+
+</body>
+</html>
